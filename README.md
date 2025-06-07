@@ -7,7 +7,7 @@ This repository is the official PyTorch implementation of **CIP**.
 
 First, create a virtual environment and install all required packages. 
 ~~~
-conda create -n cae python=3.8
+conda create -n cip python=3.8
 pip install -r requirements.txt
 ~~~
 
