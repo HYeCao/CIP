@@ -117,10 +117,8 @@ class ACE_agent(object):
             qf1_pi, qf2_pi = self.critic(state_batch, pi)
             min_qf_pi = torch.min(qf1_pi, qf2_pi)
             loss_causal_pi_reverse = loss_causal_pi_reverse * 0.01
-            if updates > 2000:
-                policy_loss = ((self.alpha * log_pi) - min_qf_pi + loss_causal_pi_reverse + loss_causal_pi).mean()  # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-            else:
-                policy_loss = ((self.alpha * log_pi) - min_qf_pi + loss_causal_pi).mean()
+            policy_loss = ((self.alpha * (log_pi-log_pi_reverse) - min_qf_pi).mean()  # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+           
             # policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
 
             self.policy_optim.zero_grad()
