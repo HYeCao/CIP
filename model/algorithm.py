@@ -44,7 +44,7 @@ class ACE_agent(object):
 
         self.policy_reverse = GaussianCausalPolicy(num_inputs*2, action_space.shape[0], args.hidden_size, action_space).to(
             self.device)
-        self.policy_optim_reverse = Adam(self.policy.parameters(), lr=args.lr)
+        self.policy_optim_reverse = Adam(self.policy_reverse.parameters(), lr=args.lr)
 
     def select_action(self, state, evaluate=False):
         state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
