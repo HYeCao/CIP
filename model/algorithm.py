@@ -104,9 +104,6 @@ class ACE_agent(object):
             qf1_pi, qf2_pi = self.critic(state_batch, pi_reverse)
             min_qf_pi = torch.min(qf1_pi, qf2_pi)
             policy_reverse_loss = ((self.alpha * pi_reverse) - min_qf_pi).mean()  # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-            self.policy_optim_reverse.zero_grad()
-            policy_reverse_loss.backward(retain_graph=True)
-            self.policy_optim_reverse.step()
 
 
             pi, log_pi, _ = self.policy.sample(state_batch, causal_weight)
@@ -122,8 +119,12 @@ class ACE_agent(object):
             # policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
 
             self.policy_optim.zero_grad()
-            policy_loss.backward()
+            policy_loss.backward(retain_graph=True)
             self.policy_optim.step()
+
+            self.policy_optim_reverse.zero_grad()
+            policy_reverse_loss.backward()
+            self.policy_optim_reverse.step()
 
             if self.automatic_entropy_tuning:
                 alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
