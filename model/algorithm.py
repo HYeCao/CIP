@@ -23,6 +23,7 @@ class ACE_agent(object):
         self.automatic_entropy_tuning = args.automatic_entropy_tuning
         self.reset = args.reset
         self.reset_interval = args.reset_interval
+        self.use_emp = args.get("use_emp", True)
 
         self.device = torch.device("cuda:{}".format(str(args.device)) if args.cuda else "cpu")
 
@@ -103,7 +104,7 @@ class ACE_agent(object):
             loss_causal_pi_reverse = - self.alpha * (log_pi_reverse - log_pi_nocausal_reverse)
             qf1_pi, qf2_pi = self.critic(state_batch, pi_reverse)
             min_qf_pi = torch.min(qf1_pi, qf2_pi)
-            policy_reverse_loss = ((self.alpha * pi_reverse) - min_qf_pi).mean()  # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+            policy_reverse_loss = ((self.alpha * log_pi_reverse) - min_qf_pi).mean()  # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
 
 
             pi, log_pi, _ = self.policy.sample(state_batch, causal_weight)
@@ -114,17 +115,21 @@ class ACE_agent(object):
             qf1_pi, qf2_pi = self.critic(state_batch, pi)
             min_qf_pi = torch.min(qf1_pi, qf2_pi)
             loss_causal_pi_reverse = loss_causal_pi_reverse * 0.01
-            policy_loss = (self.alpha * (log_pi-log_pi_reverse) - min_qf_pi).mean()  # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-           
-            # policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
+            if self.use_emp:
+                # * Full CIP: SAC objective with causal action empowerment term
+                policy_loss = (self.alpha * (log_pi - log_pi_reverse) - min_qf_pi).mean()
+            else:
+                # * w/o EMP: standard (causally weighted) SAC policy objective
+                policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
 
             self.policy_optim.zero_grad()
             policy_loss.backward(retain_graph=True)
             self.policy_optim.step()
 
-            self.policy_optim_reverse.zero_grad()
-            policy_reverse_loss.backward()
-            self.policy_optim_reverse.step()
+            if self.use_emp:
+                self.policy_optim_reverse.zero_grad()
+                policy_reverse_loss.backward()
+                self.policy_optim_reverse.step()
 
             if self.automatic_entropy_tuning:
                 alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
@@ -155,8 +160,7 @@ class ACE_agent(object):
             else:
                 factor = 1
 
-            # causal_diff = np.max(causal_weight) - np.min(causal_weight)
-            causal_diff = 0
+            causal_diff = 0 if causal_weight is None else float(np.max(causal_weight) - np.min(causal_weight))
             dormant_metrics["causal_diff"] = causal_diff
 
             if self.reset == 'causal_reset' or self.reset == 'causal_dormant_reset':
