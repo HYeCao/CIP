@@ -92,7 +92,11 @@ def train_loop(config, msg="default"):
                          augmented_actions, augmented_rewards, augmented_next_states, augmented_dones) = get_sa2r_weight_cf(env, local_buffer, agent,
                                                                                sample_size=config.causal_sample_size,
                                                                                causal_method='DirectLiNGAM')
-                        local_buffer.push_cf(augmented_states, augmented_actions, augmented_rewards, augmented_next_states, augmented_dones)
+                        # * Counterfactual augmentation: add augmented transitions to the training buffer.
+                        # * local_buffer keeps only real transitions for causal discovery.
+                        if config.use_aug:
+                            memory.push_cf(augmented_states, augmented_actions, augmented_rewards,
+                                           augmented_next_states, augmented_dones)
 
                         print("Current Causal Weight is: ", causal_weight)
                         wandb.log(
@@ -108,7 +112,7 @@ def train_loop(config, msg="default"):
                     dormant_metrics = {}
                     # Update parameters of all the networks
                     critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha, q_sac, dormant_metrics = agent.update_parameters(
-                        memory, None, config.batch_size, updates)
+                        memory, causal_weight if config.use_causal_weight else None, config.batch_size, updates)
 
                     wandb.log(dormant_metrics)
                     wandb.log(
@@ -207,6 +211,9 @@ def main():
     arg.add_arg("reset", "reset", "Types of reset")
     arg.add_arg("reset_interval", 100000, "Reset interval")
     arg.add_arg("des", "", "short description for the experiment")
+    arg.add_arg("use_aug", True, "use counterfactual data augmentation in policy training")
+    arg.add_arg("use_causal_weight", True, "use learned causal weights for the policy entropy")
+    arg.add_arg("use_emp", True, "use the causal action empowerment objective")
     arg.parser()
 
     config = default_config

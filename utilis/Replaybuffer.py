@@ -18,6 +18,9 @@ class ReplayMemory:
         self.position = (self.position + 1) % self.capacity
 
     def push_cf(self, augmented_states, augmented_actions, augmented_rewards, augmented_next_states, augmented_dones):
+        # rewards/dones are stored as scalars, matching push(), so that sample() can np.stack them
+        augmented_rewards = np.asarray(augmented_rewards).reshape(-1)
+        augmented_dones = np.asarray(augmented_dones).reshape(-1)
         for i in range(augmented_states.shape[0]):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
